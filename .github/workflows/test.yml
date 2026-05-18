@@ -70,8 +70,8 @@ jobs:
             sh "$script" >"$output_file" 2>&1 || status="$?"
 
             if [ -s "$output_file" ]; then
-              echo "::warning file=$script::Script produced output"
               cat "$output_file"
+              echo "::warning file=$script::Script produced output"
             fi
 
             rm -f "$output_file"
