@@ -65,8 +65,16 @@ jobs:
 
           for script do
             echo "::group::$script"
+            output_file="$(mktemp)"
             status=0
-            sh "$script" || status="$?"
+            sh "$script" >"$output_file" 2>&1 || status="$?"
+
+            if [ -s "$output_file" ]; then
+              echo "::warning file=$script::Script produced output"
+              cat "$output_file"
+            fi
+
+            rm -f "$output_file"
             echo "::endgroup::"
 
             if [ "$status" -ne 0 ]; then
