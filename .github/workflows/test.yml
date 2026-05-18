@@ -1,0 +1,75 @@
+name: Test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-analysis:
+    name: Static shell analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install ShellCheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes shellcheck
+
+      - name: Check POSIX shell syntax
+        run: find Darwin Linux -type f -name '*.sh' -print0 | xargs -0 -n1 sh -n
+
+      - name: Run ShellCheck
+        run: find Darwin Linux -type f -name '*.sh' -print0 | xargs -0 shellcheck --shell=sh
+
+  platform-script-run:
+    name: Run platform scripts (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: static-analysis
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-latest
+          - ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Verify passwordless sudo
+        run: sudo -n true
+
+      - name: Run scripts for current platform
+        run: |
+          platform="$(uname -s)"
+          script_dir="$platform/Scripts"
+
+          if [ ! -d "$script_dir" ]; then
+            echo "No scripts for platform: $platform"
+            exit 0
+          fi
+
+          set -- "$script_dir"/*.sh
+          if [ ! -e "$1" ]; then
+            echo "No scripts found in $script_dir"
+            exit 0
+          fi
+
+          for script do
+            echo "::group::$script"
+            status=0
+            sh "$script" || status="$?"
+            echo "::endgroup::"
+
+            if [ "$status" -ne 0 ]; then
+              exit "$status"
+            fi
+          done
